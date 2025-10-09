@@ -1,3 +1,4 @@
+from collections.abc import Iterable
 from functools import partial
 
 from pycrdt import (
@@ -30,9 +31,15 @@ class DB:
     def events(self):
         return self._events.to_py()
 
-    def create_catalogue(self, model: CatalogueModel) -> Catalogue:
+    def create_catalogue(self, model: CatalogueModel, events: Iterable[Event] | Event | None = None) -> Catalogue:
         catalogue = Catalogue(model)
-        self._catalogues[str(model.uuid)] = catalogue._map
+        with self._doc.transaction():
+            self._catalogues[str(model.uuid)] = catalogue._map
+            if events is not None:
+                if isinstance(events, Event):
+                    events = [events]
+                for event in events:
+                   catalogue.add_event(event)
         return catalogue
 
     def create_event(self, model: EventModel) -> Event:

@@ -55,6 +55,32 @@ def test_create_catalogue():
     assert db0.catalogues == db1.catalogues
 
 
+def test_create_catalogue_with_events():
+    db0 = DB()
+
+    catalogue_model0 = CatalogueModel(
+        name="cat0",
+        author="John",
+    )
+    event_model0 = EventModel(
+        start="2025-01-31",
+        stop="2026-01-31",
+        author="John",
+    )
+    event = db0.create_event(event_model0)
+    db0.create_catalogue(catalogue_model0, event)
+
+    assert db0.catalogues == {
+        str(catalogue_model0.uuid): {
+            "uuid": str(catalogue_model0.uuid),
+            "name": "cat0",
+            "author": "John",
+            "tags" : [],
+            "events": [str(event_model0.uuid)],
+        },
+    }
+
+
 def test_create_event():
     db0 = DB()
     model0 = EventModel(
@@ -153,7 +179,7 @@ def test_add_event():
     }
 
 
-def test_sync():
+def test_sync_both_ways():
     db0 = DB()
     db1 = DB()
     db0.sync(db1)
