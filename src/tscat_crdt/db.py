@@ -32,7 +32,7 @@ class DB:
         return self._events.to_py()
 
     def create_catalogue(self, model: CatalogueModel, events: Iterable[Event] | Event | None = None) -> Catalogue:
-        catalogue = Catalogue(model)
+        catalogue = Catalogue(model, self)
         with self._doc.transaction():
             self._catalogues[str(model.uuid)] = catalogue._map
             if events is not None:
