@@ -39,6 +39,7 @@ test = [
   "mypy",
   "ruff",
   "pytest",
+  "coverage",
 ]
 
 [project.urls]

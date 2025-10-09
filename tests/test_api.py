@@ -151,3 +151,10 @@ def test_add_event():
             "uuid": str(event_model.uuid),
         }
     }
+
+
+def test_sync():
+    db0 = DB()
+    db1 = DB()
+    db0.sync(db1)
+    db1.sync(db0)

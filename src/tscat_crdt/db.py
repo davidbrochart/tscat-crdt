@@ -52,7 +52,7 @@ class DB:
                 if reply is not None:
                     db._handle_sync_message(reply, self)
             except RuntimeError as exc:
-                if str(exc) != "Already mutably borrowed":
+                if str(exc) != "Already mutably borrowed":  # pragma: nocover
                     raise
 
     def sync(self, db: "DB") -> None:
