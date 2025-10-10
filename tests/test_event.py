@@ -50,3 +50,30 @@ def test_event():
     assert event.rating == 2
 
     assert event != 0
+
+    values = []
+
+    def callback(value):
+        values.append(value)
+
+    event.on_change("start", callback)
+    event.start = "2025-01-29"
+    event.stop = "2026-01-29"
+    event.start = "2025-01-28"
+
+    assert values == [datetime(2025, 1, 29, 0, 0), datetime(2025, 1, 28, 0, 0)]
+
+    values.clear()
+    event.on_change("stop", callback)
+    event.stop = "2026-01-28"
+    assert values == [datetime(2026, 1, 28, 0, 0)]
+
+    values.clear()
+    event.on_change("author", callback)
+    event.author = "Mike"
+    assert values == ["Mike"]
+
+    values.clear()
+    event.on_change("tags", callback)
+    event.tags = ["baz"]
+    assert values == [["baz"]]

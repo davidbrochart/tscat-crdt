@@ -1,13 +1,14 @@
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass
 from json import dumps
 from typing import Any, TYPE_CHECKING, cast
-from uuid import UUID
 
 from pycrdt import Array, Map
 
 from .event import Event
 from .models import CatalogueModel
+from .utils import Observable, get_getter, get_setter
 
 if sys.version_info >= (3, 11):
     from typing import Self
@@ -19,7 +20,7 @@ if TYPE_CHECKING:
 
 
 @dataclass(eq=False)
-class Catalogue:
+class Catalogue(Observable):
     _map: Map
     _db: "DB"
 
@@ -38,10 +39,10 @@ class Catalogue:
     @classmethod
     def new(cls, model: CatalogueModel, db: "DB") -> Self:
         map = Map(dict(
+            uuid=str(model.uuid),
             name=model.name,
             author=model.author,
-            uuid=str(model.uuid),
-            tags=Array(model.tags),
+            tags=model.tags,
             events=Array(model.events),
         ))
         return cls(map, db)
@@ -50,48 +51,12 @@ class Catalogue:
     def from_map(cls, map: Map, db: "DB") -> Self:
         return cls(map, db)
 
+    def on_change(self, name: str, callback: Callable[[Any], None]) -> None:
+        self._observe(CatalogueModel, name, callback)
+
     def add_event(self, event: Event) -> None:
         events = cast(Array, self._map["events"])
         events.append(event._map["uuid"])
-
-    @property
-    def uuid(self) -> UUID:
-        value = self._map["uuid"]
-        model = cast(CatalogueModel, CatalogueModel.__pydantic_validator__.validate_assignment(CatalogueModel.model_construct(), "uuid", value))
-        return model.uuid
-
-    @property
-    def name(self) -> str:
-        value = self._map["name"]
-        model = cast(CatalogueModel, CatalogueModel.__pydantic_validator__.validate_assignment(CatalogueModel.model_construct(), "name", value))
-        return model.name
-
-    @name.setter
-    def name(self, value: Any) -> None:
-        model = cast(CatalogueModel, CatalogueModel.__pydantic_validator__.validate_assignment(CatalogueModel.model_construct(), "name", value))
-        self._map["name"] = str(model.name)
-
-    @property
-    def author(self) -> str:
-        value = self._map["author"]
-        model = cast(CatalogueModel, CatalogueModel.__pydantic_validator__.validate_assignment(CatalogueModel.model_construct(), "author", value))
-        return model.author
-
-    @author.setter
-    def author(self, value: Any) -> None:
-        model = cast(CatalogueModel, CatalogueModel.__pydantic_validator__.validate_assignment(CatalogueModel.model_construct(), "author", value))
-        self._map["author"] = str(model.author)
-
-    @property
-    def tags(self) -> list[str]:
-        value = self._map["tags"]
-        model = cast(CatalogueModel, CatalogueModel.__pydantic_validator__.validate_assignment(CatalogueModel.model_construct(), "tags", value))
-        return model.tags
-
-    @tags.setter
-    def tags(self, value: Any) -> None:
-        model = cast(CatalogueModel, CatalogueModel.__pydantic_validator__.validate_assignment(CatalogueModel.model_construct(), "tags", value))
-        self._map["tags"] = model.tags
 
     @property
     def events(self) -> set[Event]:
@@ -105,3 +70,12 @@ class Catalogue:
             events.clear()
             for event in value:
                 self.add_event(event)
+
+
+Catalogue.uuid = getter = property(get_getter(CatalogueModel, "uuid"))  # type: ignore[attr-defined]
+Catalogue.name = getter = property(get_getter(CatalogueModel, "name"))  # type: ignore[attr-defined]
+Catalogue.name = getter.setter(get_setter(CatalogueModel, "name"))  # type: ignore[attr-defined]
+Catalogue.author = getter = property(get_getter(CatalogueModel, "author"))  # type: ignore[attr-defined]
+Catalogue.author = getter.setter(get_setter(CatalogueModel, "author"))  # type: ignore[attr-defined]
+Catalogue.tags = getter = property(get_getter(CatalogueModel, "tags"))  # type: ignore[attr-defined]
+Catalogue.tags = getter.setter(get_setter(CatalogueModel, "tags"))  # type: ignore[attr-defined]

@@ -1,13 +1,13 @@
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime
 from json import dumps
-from typing import Any, cast
-from uuid import UUID
+from typing import Any
 
-from pycrdt import Array, Map
+from pycrdt import Map
 
 from .models import EventModel
+from .utils import Observable, get_getter, get_setter
 
 if sys.version_info >= (3, 11):
     from typing import Self
@@ -16,7 +16,7 @@ else:  # pragma: nocover
 
 
 @dataclass(eq=False)
-class Event:
+class Event(Observable):
     _map: Map
 
     def __eq__(self, other: Any) -> bool:
@@ -38,8 +38,8 @@ class Event:
             start=str(model.start),
             stop=str(model.stop),
             author=model.author,
-            tags=Array(model.tags),
-            products=Array(model.products),
+            tags=model.tags,
+            products=model.products,
             rating=model.rating,
         ))
         return cls(map)
@@ -48,78 +48,20 @@ class Event:
     def from_map(cls, map: Map) -> Self:
         return cls(map)
 
-    @property
-    def uuid(self) -> UUID:
-        value = self._map["uuid"]
-        model = cast(EventModel, EventModel.__pydantic_validator__.validate_assignment(EventModel.model_construct(), "uuid", value))
-        return model.uuid
+    def on_change(self, name: str, callback: Callable[[Any], None]) -> None:
+        self._observe(EventModel, name, callback)
 
-    @property
-    def author(self) -> str:
-        value = self._map["author"]
-        model = cast(EventModel, EventModel.__pydantic_validator__.validate_assignment(EventModel.model_construct(), "author", value))
-        return model.author
 
-    @author.setter
-    def author(self, value: Any) -> None:
-        model = cast(EventModel, EventModel.__pydantic_validator__.validate_assignment(EventModel.model_construct(), "author", value))
-        self._map["author"] = str(model.author)
-
-    @property
-    def start(self) -> datetime:
-        value = self._map["start"]
-        model = cast(EventModel, EventModel.__pydantic_validator__.validate_assignment(EventModel.model_construct(), "start", value))
-        return model.start
-
-    @start.setter
-    def start(self, value: Any) -> None:
-        model = cast(EventModel, EventModel.__pydantic_validator__.validate_assignment(EventModel.model_construct(), "start", value))
-        self._map["start"] = str(model.start)
-
-    @property
-    def stop(self) -> datetime:
-        value = self._map["stop"]
-        model = cast(EventModel, EventModel.__pydantic_validator__.validate_assignment(EventModel.model_construct(), "stop", value))
-        return model.stop
-
-    @stop.setter
-    def stop(self, value: Any) -> None:
-        model = cast(EventModel, EventModel.__pydantic_validator__.validate_assignment(EventModel.model_construct(), "stop", value))
-        self._map["stop"] = str(model.stop)
-
-    @property
-    def tags(self) -> list[str]:
-        value = self._map["tags"]
-        model = cast(EventModel, EventModel.__pydantic_validator__.validate_assignment(EventModel.model_construct(), "tags", value))
-        return model.tags
-
-    @tags.setter
-    def tags(self, value: Any) -> None:
-        model = cast(EventModel, EventModel.__pydantic_validator__.validate_assignment(EventModel.model_construct(), "tags", value))
-        with self._map.doc.transaction():
-            tags = cast(Array, self._map["tags"])
-            tags.extend(model.tags)
-
-    @property
-    def products(self) -> list[str]:
-        value = self._map["products"]
-        model = cast(EventModel, EventModel.__pydantic_validator__.validate_assignment(EventModel.model_construct(), "products", value))
-        return model.products
-
-    @products.setter
-    def products(self, value: Any) -> None:
-        model = cast(EventModel, EventModel.__pydantic_validator__.validate_assignment(EventModel.model_construct(), "products", value))
-        with self._map.doc.transaction():
-            products = cast(Array, self._map["products"])
-            products.extend(model.products)
-
-    @property
-    def rating(self) -> int | None:
-        value = self._map["rating"]
-        model = cast(EventModel, EventModel.__pydantic_validator__.validate_assignment(EventModel.model_construct(), "rating", value))
-        return model.rating
-
-    @rating.setter
-    def rating(self, value: Any) -> None:
-        model = cast(EventModel, EventModel.__pydantic_validator__.validate_assignment(EventModel.model_construct(), "rating", value))
-        self._map["rating"] = model.rating
+Event.uuid = getter = property(get_getter(EventModel, "uuid"))  # type: ignore[attr-defined]
+Event.author = getter = property(get_getter(EventModel, "author"))  # type: ignore[attr-defined]
+Event.author = getter.setter(get_setter(EventModel, "author"))  # type: ignore[attr-defined]
+Event.start = getter = property(get_getter(EventModel, "start"))  # type: ignore[attr-defined]
+Event.start = getter.setter(get_setter(EventModel, "start", str))  # type: ignore[attr-defined]
+Event.stop = getter = property(get_getter(EventModel, "stop"))  # type: ignore[attr-defined]
+Event.stop = getter.setter(get_setter(EventModel, "stop", str))  # type: ignore[attr-defined]
+Event.tags = getter = property(get_getter(EventModel, "tags"))  # type: ignore[attr-defined]
+Event.tags = getter.setter(get_setter(EventModel, "tags"))  # type: ignore[attr-defined]
+Event.products = getter = property(get_getter(EventModel, "products"))  # type: ignore[attr-defined]
+Event.products = getter.setter(get_setter(EventModel, "products"))  # type: ignore[attr-defined]
+Event.rating = getter = property(get_getter(EventModel, "rating"))  # type: ignore[attr-defined]
+Event.rating = getter.setter(get_setter(EventModel, "rating"))  # type: ignore[attr-defined]

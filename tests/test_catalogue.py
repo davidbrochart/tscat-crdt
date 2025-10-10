@@ -50,3 +50,28 @@ def test_catalogue():
     assert catalogue.events == {event1}
 
     assert catalogue != 0
+
+    values = []
+
+    def callback(value):
+        values.append(value)
+
+    catalogue.on_change("name", callback)
+    catalogue.name = "cat1"
+    assert values == ["cat1"]
+
+    values.clear()
+    catalogue.on_change("author", callback)
+    catalogue.author = "Mike"
+    assert values == ["Mike"]
+
+    values.clear()
+    catalogue.on_change("events", callback)
+    event2 = db.create_event(EventModel(
+        start="2029-01-31",
+        stop="2030-01-31",
+        author="Mike",
+    ))
+    catalogue.events = {event0, event1, event2}
+    assert catalogue.events == {event0, event1, event2}
+    assert values == [{event0, event1, event2}]
