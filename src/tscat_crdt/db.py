@@ -24,15 +24,15 @@ class DB:
         self._synced = []
 
     @property
-    def catalogues(self):
-        return self._catalogues.to_py()
+    def catalogues(self) -> set[Catalogue]:
+        return {Catalogue.from_map(catalogue, self) for uuid, catalogue in self._catalogues.items()}
 
     @property
-    def events(self):
-        return self._events.to_py()
+    def events(self) -> set[Event]:
+        return {Event.from_map(event) for uuid, event in self._events.items()}
 
     def create_catalogue(self, model: CatalogueModel, events: Iterable[Event] | Event | None = None) -> Catalogue:
-        catalogue = Catalogue(model, self)
+        catalogue = Catalogue.new(model, self)
         with self._doc.transaction():
             self._catalogues[str(model.uuid)] = catalogue._map
             if events is not None:
@@ -43,7 +43,7 @@ class DB:
         return catalogue
 
     def create_event(self, model: EventModel) -> Event:
-        event = Event(model)
+        event = Event.new(model)
         self._events[str(model.uuid)] = event._map
         return event
 

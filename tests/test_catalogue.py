@@ -1,3 +1,4 @@
+from json import loads
 
 from tscat_crdt import DB, CatalogueModel, EventModel
 
@@ -9,13 +10,21 @@ def test_catalogue():
         author="John",
     )
     catalogue = db.create_catalogue(catalogue_model)
-    event_model0 = EventModel(
+    event_model = EventModel(
         start="2025-01-31",
         stop="2026-01-31",
         author="John",
     )
-    event = db.create_event(event_model0)
-    catalogue.add_event(event)
+    event0 = db.create_event(event_model)
+    catalogue.add_event(event0)
+
+    assert loads(repr(catalogue)) == {
+        "uuid": str(catalogue_model.uuid),
+        "events": [str(event_model.uuid)],
+        "author": "John",
+        "name": "cat0",
+        "tags": [],
+    }
 
     assert catalogue.uuid == catalogue_model.uuid
 
@@ -31,11 +40,13 @@ def test_catalogue():
     catalogue.tags = ["foo", "bar"]
     assert catalogue.tags == ["foo", "bar"]
 
-    event_model1 = EventModel(
+    event1 = db.create_event(EventModel(
         start="2027-01-31",
         stop="2028-01-31",
         author="Jeane",
-    )
-    assert catalogue.events == [event_model0]
-    catalogue.events = [event_model1]
-    assert catalogue.events == [event_model1]
+    ))
+    assert catalogue.events == {event0}
+    catalogue.events = {event1}
+    assert catalogue.events == {event1}
+
+    assert catalogue != 0

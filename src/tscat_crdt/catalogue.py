@@ -1,25 +1,54 @@
+import sys
+from dataclasses import dataclass
+from json import dumps
 from typing import Any, TYPE_CHECKING, cast
 from uuid import UUID
 
 from pycrdt import Array, Map
 
 from .event import Event
-from .models import CatalogueModel, EventModel
+from .models import CatalogueModel
+
+if sys.version_info >= (3, 11):
+    from typing import Self
+else:  # pragma: nocover
+    from typing_extensions import Self
 
 if TYPE_CHECKING:
     from .db import DB
 
 
+@dataclass(eq=False)
 class Catalogue:
-    def __init__(self, model: CatalogueModel, db: "DB") -> None:
-        self._db = db
-        self._map = Map(dict(
+    _map: Map
+    _db: "DB"
+
+    def __eq__(self, other: Any) -> bool:
+        if not isinstance(other, Catalogue):
+            return NotImplemented
+
+        return self._map["uuid"] == other._map["uuid"]
+
+    def __repr__(self) -> str:
+        return dumps(self._map.to_py())
+
+    def __hash__(self) -> int:
+        return hash(self._map["uuid"])
+
+    @classmethod
+    def new(cls, model: CatalogueModel, db: "DB") -> Self:
+        map = Map(dict(
             name=model.name,
             author=model.author,
             uuid=str(model.uuid),
             tags=Array(model.tags),
             events=Array(model.events),
         ))
+        return cls(map, db)
+
+    @classmethod
+    def from_map(cls, map: Map, db: "DB") -> Self:
+        return cls(map, db)
 
     def add_event(self, event: Event) -> None:
         events = cast(Array, self._map["events"])
@@ -65,18 +94,14 @@ class Catalogue:
         self._map["tags"] = model.tags
 
     @property
-    def events(self) -> list[EventModel]:
+    def events(self) -> set[Event]:
         event_uuids = cast(Array, self._map["events"])
-        value = [self._db._events[uuid].to_py() for uuid in event_uuids]
-        model = cast(CatalogueModel, CatalogueModel.__pydantic_validator__.validate_assignment(CatalogueModel.model_construct(), "events", value))
-        return model.events
+        return {Event.from_map(self._db._events[uuid]) for uuid in event_uuids}
 
     @events.setter
-    def events(self, value: Any) -> None:
-        model = cast(CatalogueModel, CatalogueModel.__pydantic_validator__.validate_assignment(CatalogueModel.model_construct(), "events", value))
+    def events(self, value: set[Event]) -> None:
         with self._map.doc.transaction():
             events = cast(Array, self._map["events"])
             events.clear()
-            for event_model in model.events:
-                event = self._db.create_event(event_model)
+            for event in value:
                 self.add_event(event)

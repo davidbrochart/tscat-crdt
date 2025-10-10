@@ -1,4 +1,5 @@
 from datetime import datetime
+from json import loads
 
 from tscat_crdt import DB, EventModel
 
@@ -11,6 +12,16 @@ def test_event():
         author="John",
     )
     event = db.create_event(event_model)
+
+    assert loads(repr(event)) == {
+        "uuid": str(event_model.uuid),
+        "author": "John",
+        "products": [],
+        "rating": None,
+        "start": "2025-01-31 00:00:00",
+        "stop": "2026-01-31 00:00:00",
+        "tags": [],
+    }
 
     assert event.uuid == event_model.uuid
 
@@ -37,3 +48,5 @@ def test_event():
     assert event.rating is None
     event.rating = 2
     assert event.rating == 2
+
+    assert event != 0

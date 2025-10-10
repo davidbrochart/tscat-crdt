@@ -1,4 +1,7 @@
+import sys
+from dataclasses import dataclass
 from datetime import datetime
+from json import dumps
 from typing import Any, cast
 from uuid import UUID
 
@@ -6,10 +9,31 @@ from pycrdt import Array, Map
 
 from .models import EventModel
 
+if sys.version_info >= (3, 11):
+    from typing import Self
+else:  # pragma: nocover
+    from typing_extensions import Self
 
+
+@dataclass(eq=False)
 class Event:
-    def __init__(self, model: EventModel) -> None:
-        self._map = Map(dict(
+    _map: Map
+
+    def __eq__(self, other: Any) -> bool:
+        if not isinstance(other, Event):
+            return NotImplemented
+
+        return self._map["uuid"] == other._map["uuid"]
+
+    def __repr__(self) -> str:
+        return dumps(self._map.to_py())
+
+    def __hash__(self) -> int:
+        return hash(self._map["uuid"])
+
+    @classmethod
+    def new(cls, model: EventModel) -> Self:
+        map = Map(dict(
             uuid=str(model.uuid),
             start=str(model.start),
             stop=str(model.stop),
@@ -18,6 +42,11 @@ class Event:
             products=Array(model.products),
             rating=model.rating,
         ))
+        return cls(map)
+
+    @classmethod
+    def from_map(cls, map: Map) -> Self:
+        return cls(map)
 
     @property
     def uuid(self) -> UUID:
