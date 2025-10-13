@@ -8,7 +8,7 @@ from pycrdt import Array, Map
 
 from .event import Event
 from .models import CatalogueModel
-from .utils import Observable, get_getter, get_setter
+from .utils import get_getter, get_setter
 
 if sys.version_info >= (3, 11):
     from typing import Self
@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
 
 @dataclass(eq=False)
-class Catalogue(Observable):
+class Catalogue:
     _map: Map
     _db: "DB"
     _deleted: bool = False
@@ -74,7 +74,8 @@ class Catalogue(Observable):
 
     def on_change(self, name: str, callback: Callable[[Any], None]) -> None:
         self._check_deleted()
-        self._observe(CatalogueModel, name, callback)
+        uuid = self._map["uuid"]
+        self._db._catalogue_change_callbacks[uuid][name].append(callback)
 
     def on_delete(self, callback: Callable[[], None]) -> None:
         self._check_deleted()
