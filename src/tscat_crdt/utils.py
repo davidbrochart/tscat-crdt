@@ -8,6 +8,7 @@ from pydantic import BaseModel
 
 def get_getter(model_type: type[BaseModel], name: str) -> Callable[[Any], Any]:
     def getter(self: Any) -> Any:
+        self._check_deleted()
         value = self._map[name]
         model = model_type.__pydantic_validator__.validate_assignment(model_type.model_construct(), name, value)
         return getattr(model, name)
@@ -18,6 +19,7 @@ def get_getter(model_type: type[BaseModel], name: str) -> Callable[[Any], Any]:
 
 def get_setter(model_type: type[BaseModel], name: str, func: Callable[[Any], Any] | None = None) -> Callable[[Any, Any], None]:
     def setter(self: Any, value: Any):
+        self._check_deleted()
         model = model_type.__pydantic_validator__.validate_assignment(model_type.model_construct(), name, value)
         val = getattr(model, name)
         if func is not None:
@@ -31,9 +33,9 @@ def get_setter(model_type: type[BaseModel], name: str, func: Callable[[Any], Any
 class Observable:
     _map: Map
     _subscription: Subscription | None = None
-    _observed_keys: dict[str, list[Callable[[MapEvent], None]]] | None = None
+    _observed_keys: dict[str, list[Callable[[Any], None]]] | None = None
 
-    def _observe(self, model_type: type[BaseModel], key: str, callback) -> None:
+    def _observe(self, model_type: type[BaseModel], key: str, callback: Callable[[Any], None]) -> None:
         if self._subscription is None:
             self._observed_keys = {}
             self._subscription = self._map.observe_deep(partial(self._callback, model_type))
@@ -67,7 +69,7 @@ class Observable:
                     if uuids:
                         from .event import Event
 
-                        result = {Event.from_map(self._db._events[uuid]) for uuid in uuids}
+                        result = {Event.from_map(self._db._event_maps[uuid], self._db) for uuid in uuids}
                         callbacks = self._observed_keys["events"]
                         for callback in callbacks:
                             callback(result)

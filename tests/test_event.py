@@ -1,6 +1,8 @@
 from datetime import datetime
 from json import loads
 
+import pytest
+
 from tscat_crdt import DB, EventModel
 
 
@@ -11,7 +13,16 @@ def test_event():
         stop="2026-01-31",
         author="John",
     )
-    event = db.create_event(event_model)
+
+    event = None
+
+    def create_event_callback(_event):
+        nonlocal event
+        event = _event
+
+    db.on_create_event(create_event_callback)
+
+    assert event == db.create_event(event_model)
 
     assert loads(repr(event)) == {
         "uuid": str(event_model.uuid),
@@ -77,3 +88,18 @@ def test_event():
     event.on_change("tags", callback)
     event.tags = ["baz"]
     assert values == [["baz"]]
+
+    deleted = False
+
+    def delete_callback():
+        nonlocal deleted
+        deleted = True
+
+    event.on_delete(delete_callback)
+    event.delete()
+
+    assert deleted
+
+    with pytest.raises(RuntimeError) as excinfo:
+        event.author = "Paul"
+    assert str(excinfo.value) == "Event has been deleted"

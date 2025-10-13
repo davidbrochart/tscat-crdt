@@ -2,7 +2,7 @@ import sys
 from collections.abc import Callable
 from dataclasses import dataclass
 from json import dumps
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 from pycrdt import Map
 
@@ -14,27 +14,36 @@ if sys.version_info >= (3, 11):
 else:  # pragma: nocover
     from typing_extensions import Self
 
+if TYPE_CHECKING:
+    from .db import DB
+
 
 @dataclass(eq=False)
 class Event(Observable):
     _map: Map
+    _db: "DB"
+    _deleted: bool = False
 
     def __eq__(self, other: Any) -> bool:
+        self._check_deleted()
         if not isinstance(other, Event):
             return NotImplemented
 
         return self._map["uuid"] == other._map["uuid"]
 
     def __repr__(self) -> str:
+        self._check_deleted()
         return dumps(self._map.to_py())
 
     def __hash__(self) -> int:
+        self._check_deleted()
         return hash(self._map["uuid"])
 
     @classmethod
-    def new(cls, model: EventModel) -> Self:
+    def new(cls, model: EventModel, db: "DB") -> Self:
+        uuid = str(model.uuid)
         map = Map(dict(
-            uuid=str(model.uuid),
+            uuid=uuid,
             start=str(model.start),
             stop=str(model.stop),
             author=model.author,
@@ -42,14 +51,41 @@ class Event(Observable):
             products=model.products,
             rating=model.rating,
         ))
-        return cls(map)
+        self = cls(map, db)
+        db._events[uuid] = self
+        return self
 
     @classmethod
-    def from_map(cls, map: Map) -> Self:
-        return cls(map)
+    def from_map(cls, map: Map, db: "DB") -> Self:
+        self = cls(map, db)
+        uuid = map["uuid"]
+        db._events[uuid] = self
+        return self
+
+    @classmethod
+    def from_uuid(cls, uuid: str, db: "DB") -> Self:
+        map = db._event_maps[uuid]
+        self = cls(map, db)
+        db._events[uuid] = self
+        return self
+
+    def _check_deleted(self):
+        if self._deleted:
+            raise RuntimeError("Event has been deleted")
 
     def on_change(self, name: str, callback: Callable[[Any], None]) -> None:
+        self._check_deleted()
         self._observe(EventModel, name, callback)
+
+    def on_delete(self, callback: Callable[[], None]) -> None:
+        self._check_deleted()
+        uuid = self._map["uuid"]
+        self._db._event_delete_callbacks[uuid].append(callback)
+
+    def delete(self):
+        self._check_deleted()
+        del self._db._event_maps[self._map["uuid"]]
+
 
 
 Event.uuid = getter = property(get_getter(EventModel, "uuid"))  # type: ignore[attr-defined]

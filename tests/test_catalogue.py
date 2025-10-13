@@ -1,5 +1,7 @@
 from json import loads
 
+import pytest
+
 from tscat_crdt import DB, CatalogueModel, EventModel
 
 
@@ -9,7 +11,17 @@ def test_catalogue():
         name="cat0",
         author="John",
     )
-    catalogue = db.create_catalogue(catalogue_model)
+
+    catalogue = None
+
+    def create_catalogue_callback(_catalogue):
+        nonlocal catalogue
+        catalogue = _catalogue
+
+    db.on_create_catalogue(create_catalogue_callback)
+
+    assert catalogue == db.create_catalogue(catalogue_model)
+
     event_model = EventModel(
         start="2025-01-31",
         stop="2026-01-31",
@@ -75,3 +87,18 @@ def test_catalogue():
     catalogue.events = {event0, event1, event2}
     assert catalogue.events == {event0, event1, event2}
     assert values == [{event0, event1, event2}]
+
+    deleted = False
+
+    def delete_callback():
+        nonlocal deleted
+        deleted = True
+
+    catalogue.on_delete(delete_callback)
+    catalogue.delete()
+
+    assert deleted
+
+    with pytest.raises(RuntimeError) as excinfo:
+        catalogue.name = "cat2"
+    assert str(excinfo.value) == "Catalogue has been deleted"
