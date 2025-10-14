@@ -20,24 +20,31 @@ if TYPE_CHECKING:
 
 @dataclass(eq=False)
 class Event:
+    _uuid: str
     _map: Map
     _db: "DB"
-    _deleted: bool = False
+
+    def _check_deleted(self):
+        if self._uuid not in self._db._event_maps:
+            raise RuntimeError("Event has been deleted")
 
     def __eq__(self, other: Any) -> bool:
-        self._check_deleted()
-        if not isinstance(other, Event):
-            return NotImplemented
+        with self._map.doc.transaction():
+            self._check_deleted()
+            if not isinstance(other, Event):
+                return NotImplemented
 
-        return self._map["uuid"] == other._map["uuid"]
+            return self._uuid == other._uuid
 
     def __repr__(self) -> str:
-        self._check_deleted()
-        return dumps(self._map.to_py())
+        with self._map.doc.transaction():
+            self._check_deleted()
+            return dumps(self._map.to_py())
 
     def __hash__(self) -> int:
-        self._check_deleted()
-        return hash(self._map["uuid"])
+        with self._map.doc.transaction():
+            self._check_deleted()
+            return hash(self._uuid)
 
     @classmethod
     def new(cls, model: EventModel, db: "DB") -> Self:
@@ -51,42 +58,42 @@ class Event:
             products=model.products,
             rating=model.rating,
         ))
-        self = cls(map, db)
+        self = cls(uuid, map, db)
         db._events[uuid] = self
         return self
 
     @classmethod
     def from_map(cls, map: Map, db: "DB") -> Self:
-        self = cls(map, db)
         uuid = map["uuid"]
+        self = cls(uuid, map, db)
         db._events[uuid] = self
         return self
 
     @classmethod
     def from_uuid(cls, uuid: str, db: "DB") -> Self:
         map = db._event_maps[uuid]
-        self = cls(map, db)
+        self = cls(uuid, map, db)
         db._events[uuid] = self
         return self
 
-    def _check_deleted(self):
-        if self._deleted:
-            raise RuntimeError("Event has been deleted")
-
     def on_change(self, name: str, callback: Callable[[Any], None]) -> None:
-        self._check_deleted()
-        uuid = self._map["uuid"]
-        self._db._event_change_callbacks[uuid][name].append(callback)
+        with self._map.doc.transaction():
+            self._check_deleted()
+            self._db._event_change_callbacks[self._uuid][name].append(callback)
 
     def on_delete(self, callback: Callable[[], None]) -> None:
-        self._check_deleted()
-        uuid = self._map["uuid"]
-        self._db._event_delete_callbacks[uuid].append(callback)
+        with self._map.doc.transaction():
+            self._check_deleted()
+            self._db._event_delete_callbacks[self._uuid].append(callback)
 
     def delete(self):
-        self._check_deleted()
-        del self._db._event_maps[self._map["uuid"]]
-
+        with self._map.doc.transaction():
+            self._check_deleted()
+            del self._db._event_maps[self._uuid]
+            for uuid, catalogue in self._db._catalogue_maps.items():
+                catalogue_events = catalogue["events"]
+                if self._uuid in catalogue_events:
+                    del catalogue_events[self._uuid]
 
 
 Event.uuid = getter = property(get_getter(EventModel, "uuid"))  # type: ignore[attr-defined]

@@ -41,19 +41,24 @@ class DB:
         for event in events:
             path = event.path  # type: ignore[union-attr]
             if len(path) == 0:
+                # catalogue created or deleted
                 assert isinstance(event, MapEvent)
                 keys = event.keys  # type: ignore[attr-defined]
                 for uuid in keys:
                     action = keys[uuid]["action"]
                     if action == "delete":
-                        if uuid in self._catalogues:
-                            self._catalogues[uuid]._deleted = True
                         for delete_callback in self._catalogue_delete_callbacks[uuid]:
                             delete_callback()
+                        if uuid in self._catalogues:
+                            del self._catalogues[uuid]
+                        del self._catalogue_delete_callbacks[uuid]
+                        self._catalogue_change_callbacks
+                        del self._catalogue_change_callbacks[uuid]
                     elif action == "add":
                         for create_callback in self._catalogue_create_callbacks:
                             create_callback(self.get_catalogue(uuid))
             elif len(path) == 1:
+                # property of catalogue changed (not events)
                 assert isinstance(event, MapEvent)
                 uuid = path[0]
                 changed_keys = event.keys  # type: ignore[attr-defined]
@@ -65,23 +70,29 @@ class DB:
                             model = CatalogueModel.__pydantic_validator__.validate_assignment(CatalogueModel.model_construct(), key, value)
                             callback(getattr(model, key))
             elif len(path) == 2:
+                # catalogue events changed
                 assert path[1] == "events"
-                assert isinstance(event, ArrayEvent)
+                assert isinstance(event, MapEvent)
                 uuid = path[0]
-                if "events" in self._catalogue_change_callbacks[uuid]:
-                    i = 0
-                    uuids = []
-                    for action in event.delta:  # type: ignore[attr-defined]
-                        if "delete" in action:  # FIXME: handle removed events
-                            i += action["delete"]
-                        elif "insert" in action:
-                            uuids.extend(action["insert"])
-                            i += len(uuids)
-                    if uuids:
-                        from .event import Event
-
-                        result = {Event.from_map(self._event_maps[uuid], self) for uuid in uuids}
-                        callbacks = self._catalogue_change_callbacks[uuid]["events"]
+                if (
+                    "added_events" in self._catalogue_change_callbacks[uuid] or
+                    "removed_events" in self._catalogue_change_callbacks[uuid]
+                ):
+                    added_uuids = []
+                    removed_uuids = []
+                    keys = event.keys  # type: ignore[attr-defined]
+                    for key, val in keys.items():
+                        if val["action"] == "delete":
+                            removed_uuids.append(key)
+                        else:
+                            added_uuids.append(key)
+                    if removed_uuids:
+                        callbacks = self._catalogue_change_callbacks[uuid]["removed_events"]
+                        for callback in callbacks:
+                            callback(set(removed_uuids))
+                    if added_uuids:
+                        result = {Event.from_map(self._event_maps[added_uuid], self) for added_uuid in added_uuids}
+                        callbacks = self._catalogue_change_callbacks[uuid]["added_events"]
                         for callback in callbacks:
                             callback(result)
 
@@ -94,10 +105,13 @@ class DB:
                 for uuid in keys:
                     action = keys[uuid]["action"]
                     if action == "delete":
-                        if uuid in self._events:
-                            self._events[uuid]._deleted = True
                         for delete_callback in self._event_delete_callbacks[uuid]:
                             delete_callback()
+                        if uuid in self._events:
+                            del self._events[uuid]
+                        del self._event_delete_callbacks[uuid]
+                        self._event_change_callbacks[uuid]
+                        del self._event_change_callbacks[uuid]
                     elif action == "add":
                         for create_callback in self._event_create_callbacks:
                             create_callback(self.get_event(uuid))

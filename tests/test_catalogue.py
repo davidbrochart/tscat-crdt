@@ -77,27 +77,37 @@ def test_catalogue():
     catalogue.author = "Mike"
     assert values == ["Mike"]
 
-    values.clear()
-    catalogue.on_change("events", callback)
+    added_events = []
+    removed_events = []
+    catalogue.on_add_events(lambda events: added_events.append(events))
+    catalogue.on_remove_events(lambda events: removed_events.append(events))
     event2 = db.create_event(EventModel(
         start="2029-01-31",
         stop="2030-01-31",
         author="Mike",
     ))
-    catalogue.events = {event0, event1, event2}
-    assert catalogue.events == {event0, event1, event2}
-    assert values == [{event0, event1, event2}]
+    catalogue.events = {event0, event2}
+    assert removed_events == [{str(event1.uuid)}]
+    assert added_events == [{event0, event2}]
 
-    deleted = False
+    removed_events.clear()
+    catalogue.remove_event(event0)
+    assert catalogue.events == {event2}
+    assert removed_events == [{str(event0.uuid)}]
+
+    event2.delete()
+    assert catalogue.events == set()
+
+    catalogue_deleted = False
 
     def delete_callback():
-        nonlocal deleted
-        deleted = True
+        nonlocal catalogue_deleted
+        catalogue_deleted = True
 
     catalogue.on_delete(delete_callback)
     catalogue.delete()
 
-    assert deleted
+    assert catalogue_deleted
 
     with pytest.raises(RuntimeError) as excinfo:
         catalogue.name = "cat2"

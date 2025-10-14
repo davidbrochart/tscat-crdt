@@ -19,4 +19,4 @@ class CatalogueModel(BaseModel):
     name: str
     author: str
     tags: list[str] = Field(default_factory=list)
-    events: list[EventModel] = Field(default_factory=list)
+    events: dict[str, bool] = Field(default_factory=dict)
