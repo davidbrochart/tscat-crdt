@@ -1,5 +1,11 @@
 # Version history
 
+## 0.3.0
+
+- Add high-level user API and CLI.
+- Remove models from public API.
+- Disable event callback when same origin.
+
 ## 0.2.1
 
 - Bump WireDB v0.2.0.
