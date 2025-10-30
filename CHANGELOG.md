@@ -1,5 +1,9 @@
 # Version history
 
+## 0.3.1
+
+- Add `wiredb` to dependencies.
+
 ## 0.3.0
 
 - Add high-level user API and CLI.
