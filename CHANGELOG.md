@@ -1,5 +1,10 @@
 # Version history
 
+## 0.4.0
+
+- Add user authentication.
+- Remove `client` extra-dependency.
+
 ## 0.3.1
 
 - Add `wiredb` to dependencies.
