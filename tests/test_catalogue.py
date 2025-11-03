@@ -143,3 +143,52 @@ def test_catalogue():
     with pytest.raises(RuntimeError) as excinfo:
         catalogue0.name = "cat2"
     assert str(excinfo.value) == "Catalogue has been deleted"
+
+
+def test_dynamic_catalogue():
+    db = DB()
+
+    event0 = db.create_event(
+        start="2025-01-31",
+        stop="2026-01-31",
+        author="John",
+        attributes={"foo": "bar"},
+    )
+    event1 = db.create_event(
+        start="2025-01-30",
+        stop="2026-01-30",
+        author="Paul",
+    )
+
+    catalogue0 = db.create_catalogue(
+        name="cat0",
+        author="Steve",
+    )
+    catalogue0.set_dynamic_filter("event.start > datetime(2025, 1, 30) and event.stop <= datetime(2026, 1, 31)")
+    assert catalogue0.dynamic_events == {event0}
+    assert not catalogue0.events
+
+    catalogue1 = db.create_catalogue(
+        name="cat1",
+        author="Steve",
+    )
+    catalogue1.set_dynamic_filter("'baz' in event.attributes.values()")
+    assert not catalogue1.dynamic_events
+    assert not catalogue1.events
+    assert not catalogue1.all_events
+    catalogue1.set_dynamic_filter("'bar' in event.attributes.values()")
+    assert catalogue1.dynamic_events == {event0}
+    assert not catalogue1.events
+    assert catalogue1.all_events == {event0}
+
+    catalogue0.add_events([event0, event1])
+    catalogue1.add_events(event0)
+    catalogue2 = db.create_catalogue(
+        name="cat2",
+        author="Mike",
+    )
+    catalogue2.set_dynamic_filter("event in catalogue('cat0') and event not in catalogue('cat1')")
+    assert catalogue2.dynamic_events == {event1}
+
+    catalogue2.set_dynamic_filter()
+    assert not catalogue2.dynamic_events
